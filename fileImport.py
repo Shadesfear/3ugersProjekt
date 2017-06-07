@@ -1,5 +1,6 @@
 import os
 import numpy as np
+
 def fileImport(directory, ext ,delimiter,skip_head=0,skip_foot=0):
 	#global table
 	table= {}
