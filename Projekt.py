@@ -17,4 +17,15 @@ subdirs = [x[1] for x in os.walk(dataDir)][0]
 for x in subdirs:
 	table.update(fileImport(dataDir + x,'.txt', skip_head = 19, skip_foot= 2, delimiter ='\t'))
 
-print(len(table))
+arb = {}
+for x in table:
+	arb[x] = table['nobub165'][:,1] - table[x][:,1]
+
+print(arb['forsoeg464'])
+
+plt.plot(table['forsoeg456'][:,0],arb['forsoeg456'], label = 'arbsorbtion')
+plt.plot(table['forsoeg456'][:,0],table['forsoeg456'][:,1], label = 'målt')
+plt.plot(table['nobub165'][:,0],table['nobub165'][:,1], label = 'baggrund')
+plt.legend()
+
+plt.show()
