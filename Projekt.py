@@ -33,11 +33,12 @@ def movingaverage(interval, window_size):
     window= np.ones(int(window_size))/float(window_size)
     return np.convolve(interval, window, 'same')
 
-newy = movingaverage(I0 * (1 - r) - table['forsoeg765'][:,1], 100)
+newy = movingaverage(movingaverage(movingaverage(I0 * (1 - r) - table['forsoeg765'][:,1], 100), 100),100)
 
 peaks = detect_peaks(newy, mph=100, mpd=500)
 
 print(table['forsoeg765'][peaks,0])
 
+plt.plot(table['forsoeg765'][:,0], I0 * (1 - r) - table['forsoeg765'][:,1], 'r-', label='fit')
 plt.plot(table['forsoeg765'][:,0], newy, 'g-', label='fit')
 plt.show()
