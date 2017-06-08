@@ -11,7 +11,6 @@ def fileImport(directory, ext ,delimiter,skip_head=0,skip_foot=0):
 				table[x[:-len(ext)]] = np.genfromtxt(directory+'\\'+x, delimiter = delimiter, skip_header = skip_head, skip_footer = skip_foot)
 			except:
 				print('Some error occured while doing stuff to '  + x)
-
 		try:		
 			if 'nan' in str(table[x[:-len(ext)]]):
 				print('Something is returning nan in ' + x)
