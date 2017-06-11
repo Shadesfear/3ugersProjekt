@@ -6,7 +6,7 @@ from fileImport import fileImport
 from detect_peaks import detect_peaks
 from movingaverage import movingaverage
 
-
+################################################################################
 #Dict to store data
 table = {}
 
@@ -30,33 +30,35 @@ I0 = I0 / 50
 
 # Find the refractive index of the solution
 n1 = 1.0
-n2 = 1.333
-r = ((n1 - n2)/(n1 + n2)) ** 2
+n2 = 1.3
+r = ((n2 - n1)/(n1 + n2)) ** 2
+################################################################################
+# Main code for finding lambda etc
+def main(expnr, measnr):
+	# Find the absorption-spectrum for experiment NMM
+	exp = 'forsoeg' + str(expnr) + str(measnr) # experiment
+	I = table[exp][:,1] # intensity
+	a = I0 * (1 - r)**2 / (1 - r**2) - I # absorption
+	A = movingaverage(a, 100, 3) # absorption (movingaverage to smooth out the function)
 
-# Find the absorption-spectrum for experiment NMM
-exp = 'forsoeg765' # experiment
-I = table[exp][:,1] # intensity
-a = I0 * (1 - r) - I # absorption
-A = movingaverage(movingaverage(movingaverage(movingaverage(movingaverage(a, 100), 100),100),100),100) # absorption (movingaverage to smooth out the function)
+	# Find peaks
+	peakIndices = detect_peaks(A, mph=10, mpd=100)
+	peaks = []
+	for peakIndex in peakIndices:
+		peaks.append(table[exp][peakIndex,0])
+	print(peaks)
 
-plt.plot(table[exp][:,0], I0)
-plt.show()
+	# Figure with results
+	plt.plot(table[exp][:,0], a, 'b-', label='fit')
+	plt.plot(table[exp][:,0], A, 'r-', label='fit')
+	for peak in peaks:
+		plt.axvline(x=peak)
+	plt.show()
 
-# Find peaks
-peakIndices = detect_peaks(A, mph=100, mpd=100)
-peaks = []
-for peakIndex in peakIndices:
-	peaks.append(table[exp][peakIndex,0])
-print(peaks)
+	# Find lambda2 (inside the filmen) in [nm]
+	lambda2 = (max(peaks) - min(peaks)) / ( len(peaks) - 1)
+	lambda1 = lambda2 * ( n2 / n1 )
+	print(lambda2)
+################################################################################
 
-# Find lambda2 (inside the filmen) in [nm]
-lambda2 = (max(peaks) - min(peaks)) / len(peaks)
-lambda1 = lambda2 * ( n2 / n1 )
-print(lambda2)
-
-# Figure with results
-plt.plot(table[exp][:,0], a, 'b-', label='fit')
-plt.plot(table[exp][:,0], A, 'r-', label='fit')
-for peak in peaks:
-	plt.axvline(x=peak)
-plt.show()
+main(7, 59)
