@@ -6,6 +6,7 @@ from fileImport import fileImport
 from detect_peaks import detect_peaks
 from movingaverage import movingaverage
 import math
+import scipy.fftpack
 
 ################################################################################
 #Dict to store data
@@ -31,7 +32,7 @@ I0 = I0 / 50
 
 # Find the refractive index of the solution
 n1 = 1.0
-n2 = 1.3
+n2 = 1.333
 r = ((n2 - n1)/(n1 + n2)) ** 2
 
 ################################################################################
@@ -60,13 +61,29 @@ def findlambda2(expnr, measnr):
 	# for peak in peaks:
 	# 	plt.axvline(x=peak)
 	# plt.show()
+	N = len(table[exp][:,0])
+	T = (table[exp][-1,0] - table[exp][0,0]) / N # spacing between points (lambdas)
+	freqs = np.linspace(0.0, 1.0 / (2.0 * T), N / 2.0)
+	A_fourier = scipy.fftpack.fft(A)
+	a_fourier = scipy.fftpack.fft(a)
+
+	# plt.plot(freqs, 2.0/N * np.abs(A_fourier[:N//2]), 'b.')
+	# plt.show()
+
+	# maxfreqIndex = a_fourier.index(max(a_fourier[2:]))
+	maxfreqIndex = np.argmax(A_fourier[2:len(A_fourier)//2])
+	maxfreq = freqs[maxfreqIndex]
+	# print(maxfreq)
 
 	# Find lambda2 (inside the film) in [nm]
-	if len(peaks) > 1:
-		lambda1 = (max(peaks) - min(peaks)) / ( len(peaks) - 1)
-		lambda2 = lambda1 * ( n1 / n2 )
-	else:
-		lambda2 = math.nan
+	# if len(peaks) > 1:
+	# 	lambda1 = (max(peaks) - min(peaks)) / ( len(peaks) - 1)
+	# 	lambda2 = lambda1 * ( n1 / n2 )
+	# else:
+	# 	lambda2 = math.nan
+
+	lambda1 = (table[exp][-1,0] - table[exp][0,0]) / maxfreqIndex # missing a factor of 2 cf def. of freqs?
+	lambda2 = lambda1 * (n1 / n2)
 
 	return lambda2
 
