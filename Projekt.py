@@ -13,7 +13,8 @@ import scipy.fftpack
 ################################################################################
 # The method to use
 method = input('Please Choose "fourier" or "peaks": ')
-
+if not method:
+	method = 'peaks'
 #Dict to store data
 table = {}
 
@@ -70,7 +71,7 @@ def findlambda2(expnr, measnr, showgraphs, method): # type = 'fourier' or 'peaks
 			plt.show()
 		# Find lambda2 (inside the film) in [nm]
 		if len(peaks) > 1:
-			m = abs((min(peaks) - max(peaks) * (1 + (2 * (len(peaks) - 1)))) / (2 * (max(peaks) - min(peaks))))
+			m = abs(((min(peaks) * (1 + (2 * (len(peaks) - 1)))) - max(peaks) ) / (2 * (max(peaks) - min(peaks))))
 			lambda1 = (m / 2) * min(peaks)
 			lambda2 = lambda1 * ( n1 / n2 )
 		else:
