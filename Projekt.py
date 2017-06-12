@@ -5,6 +5,7 @@ import os
 from fileImport import fileImport
 from detect_peaks import detect_peaks
 from movingaverage import movingaverage
+import math
 
 ################################################################################
 #Dict to store data
@@ -32,11 +33,15 @@ I0 = I0 / 50
 n1 = 1.0
 n2 = 1.3
 r = ((n2 - n1)/(n1 + n2)) ** 2
+
 ################################################################################
 # Main code for finding lambda etc
-def main(expnr, measnr):
+def findlambda2(expnr, measnr):
 	# Find the absorption-spectrum for experiment NMM
-	exp = 'forsoeg' + str(expnr) + str(measnr) # experiment
+	if len(str(measnr)) < 2:
+		exp = 'forsoeg' + str(expnr) + str(0) + str(measnr)
+	else:
+		exp = 'forsoeg' + str(expnr) + str(measnr) # experiment
 	I = table[exp][:,1] # intensity
 	a = I0 * (1 - r)**2 / (1 - r**2) - I # absorption
 	A = movingaverage(a, 100, 3) # absorption (movingaverage to smooth out the function)
@@ -45,20 +50,41 @@ def main(expnr, measnr):
 	peakIndices = detect_peaks(A, mph=10, mpd=100)
 	peaks = []
 	for peakIndex in peakIndices:
-		peaks.append(table[exp][peakIndex,0])
-	print(peaks)
+		if (table[exp][peakIndex,0] > 400 and table[exp][peakIndex,0] < 1000):
+			peaks.append(table[exp][peakIndex,0])
+	# print(peaks)
 
-	# Figure with results
-	plt.plot(table[exp][:,0], a, 'b-', label='fit')
-	plt.plot(table[exp][:,0], A, 'r-', label='fit')
-	for peak in peaks:
-		plt.axvline(x=peak)
-	plt.show()
+	# # Figure with results
+	# plt.plot(table[exp][:,0], a, 'b-', label='fit')
+	# plt.plot(table[exp][:,0], A, 'r-', label='fit')
+	# for peak in peaks:
+	# 	plt.axvline(x=peak)
+	# plt.show()
 
-	# Find lambda2 (inside the filmen) in [nm]
-	lambda2 = (max(peaks) - min(peaks)) / ( len(peaks) - 1)
-	lambda1 = lambda2 * ( n2 / n1 )
-	print(lambda2)
+	# Find lambda2 (inside the film) in [nm]
+	if len(peaks) > 1:
+		lambda1 = (max(peaks) - min(peaks)) / ( len(peaks) - 1)
+		lambda2 = lambda1 * ( n1 / n2 )
+	else:
+		lambda2 = math.nan
+
+	return lambda2
+
 ################################################################################
+lambda2 = {}
+for i in range(1, 7+1):
+	lambda2[str(i)] = []
+	for j in range(0,99+1):
+		# Following line filters out the beginning measurements (where the beaker was blocking the signal)
+		if not ((i == 1 and j < 7) or (i == 2 and j < 16) or (i == 3 and j < 12) or (i == 4 and j < 9)
+		or (i == 5 and j < 12) or (i == 6 and j < 11) or (i == 7 and j < 12)):
+			lambda2[str(i)].append(findlambda2(i,j))
+		else:
+			lambda2[str(i)].append(math.nan)
+		j += 1
+	i += 1
 
-main(7, 59)
+time = np.linspace(0, 8, num=100)
+for i in range(1, len(lambda2)+1):
+	plt.plot(time, lambda2[str(i)], 'b.', label='fit')
+	plt.show()
