@@ -50,7 +50,7 @@ def nindex(l):
 
 ################################################################################
 # Main code for finding lambda etc
-def findlambda2(expnr, measnr, showgraphs, fouriermethod): # type = 'fourier' or 'peaks'
+def findD(expnr, measnr, showgraphs, fouriermethod): # type = 'fourier' or 'peaks'
 	# Find the absorption-spectrum for experiment NMM
 	if len(str(measnr)) < 2:
 		exp = 'forsoeg' + str(expnr) + str(0) + str(measnr)
@@ -75,7 +75,7 @@ def findlambda2(expnr, measnr, showgraphs, fouriermethod): # type = 'fourier' or
 			plt.plot(table[exp][:,0], a, 'b-', label='fit')
 			plt.plot(table[exp][:,0], A, 'r-', label='fit')
 			for peak in peaks:
-				plt.axvline(x=peak)
+				plt.axvline(x=peak, color='g')
 			plt.show()
 		# Find lambda2 (inside the film) in [nm]
 		lambda2 = 0
@@ -86,7 +86,8 @@ def findlambda2(expnr, measnr, showgraphs, fouriermethod): # type = 'fourier' or
 			lambda2 = lambda2 / (len(peaks) - 1)
 		else:
 			lambda2 = math.nan
-		return lambda2
+		D = lambda2 / 2
+		return D
 
 	if fouriermethod:
 		N = len(table[exp][:,0])
@@ -112,16 +113,16 @@ def findlambda2(expnr, measnr, showgraphs, fouriermethod): # type = 'fourier' or
 
 # Make dict of lambda2 where each entry is an array of lambda as a function of time for the given experiment
 # (convert to d)
-lambda2 = {}
+D = {}
 for i in range(0, 7):
-	lambda2[str(i)] = []
+	D[str(i)] = []
 	for j in range(0,100):
 		# Following line filters out the beginning measurements (where the beaker was blocking the signal)
 		if not ((i == 0 and j < 7) or (i == 1 and j < 16) or (i == 2 and j < 12) or (i == 3 and j < 9)
 		or (i == 4 and j < 12) or (i == 5 and j < 11) or (i == 6 and j < 12)):
-			lambda2[str(i)].append(findlambda2(i + 1, j, showgraphs, fouriermethod))
+			D[str(i)].append(findD(i + 1, j, showgraphs, fouriermethod))
 		else:
-			lambda2[str(i)].append(math.nan)
+			D[str(i)].append(math.nan)
 		j += 1
 	i += 1
 
@@ -139,10 +140,10 @@ concentrations[6] = 1
 # Function to fit to (cf theory)
 def func(x, a, b):
 	return(1 / np.sqrt(a * x + b))
-
+# Linear function
 def linfunc(x,a,b):
 	return(a * x + b)
-
+# Transform of d, so is linear
 def transmodel(my_list):
     return [ 1/x**2 for x in my_list ]
 
@@ -152,27 +153,31 @@ bvals = [0, 0, 0, 0, 0, 0, 0]
 for i in range(0, 7):
 	x = []
 	y = []
-	for idx in range(0,len(lambda2[str(i)])):
-		if not 'nan' in str(lambda2[str(i)][idx]):
-			y.append(lambda2[str(i)][idx])
+	for idx in range(0,len(D[str(i)])):
+		if not 'nan' in str(D[str(i)][idx]):
+			y.append(D[str(i)][idx])
 			x.append(time[idx])
 	popt, pcov = curve_fit(linfunc, x, transmodel(y), p0 = [1, 1])
 	avals[i] = popt[0]
 	bvals[i] = popt[1]
-	# Plot
+
+	# Plot fit and data
 	plt.figure()
-	plt.plot(time, transmodel(lambda2[str(i)]), 'b.', label= str(round(100 * concentrations[i])) + ' vol%')
+	plt.plot(time, transmodel(D[str(i)]), 'b.', label= str(round(100 * concentrations[i])) + ' vol%')
 	plt.plot(time, linfunc(time, avals[i], bvals[i]), 'r-', label= 'fit')
 	plt.ylabel('$1/d^2$ [nm$^{-2}$]')
 	plt.xlabel('$t$ [s]')
 	plt.legend()
-#print(avals)
+
+print('Values of a (in $1/d^2 = a t + b$) for experiments 1-7:')
+print(avals)
+print('\n')
 #print(bvals)
 
 # Plot all data in one figure
 plt.figure()
 for i in range(0, 7):
-	plt.plot(time, lambda2[str(i)], '.', label= str(round(100 * concentrations[i])) + ' vol%')
+	plt.plot(time, D[str(i)], '.', label= str(round(100 * concentrations[i])) + ' Vol-%')
 plt.legend()
 plt.axis([0, 8, 900, 3000])
 plt.ylabel('$d$ [nm]')
