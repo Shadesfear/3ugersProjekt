@@ -18,14 +18,31 @@ for x in subdirs:
 	table.update(fileImport(dataDir + x,'.txt', skip_head = 19, skip_foot= 2, delimiter ='\t'))
 
 arb = {}
+transm = ((1-1.4)**2)/(2.4)**2
+print(transm)
 for x in table:
-	arb[x] = table['nobub165'][:,1] - table[x][:,1]
+	arb[x] = table['nobub165'][:,1]-table['nobub165'][:,1]*transm - table[x][:,1]
 
 print(arb['forsoeg464'])
 
-plt.plot(table['forsoeg456'][:,0],arb['forsoeg456'], label = 'arbsorbtion')
-plt.plot(table['forsoeg456'][:,0],table['forsoeg456'][:,1], label = 'målt')
-plt.plot(table['nobub165'][:,0],table['nobub165'][:,1], label = 'baggrund')
+def movingaverage (values, window):
+	weights = np.repeat(1.0, window)/window
+	sma = np.convolve(values, weights, 'valid')
+	return sma
+
+def movingaveragex(values, window, N):
+	va = values
+	for x in range(0,N,1):
+		ma = movingaverage(va, window)
+		va = ma
+	return ma
+
+wi= 40
+Na = 3
+for x in range(1,8,1):
+	plt.figure(x)
+	plt.plot(table['forsoeg456'][:-(wi-1)*Na,0],movingaveragex(arb['forsoeg'+str(x)+'15'],wi,Na),"s",table['forsoeg456'][:-(wi-1)*Na,0],movingaveragex(arb['forsoeg'+str(x)+'30'],wi,Na),"*",table['forsoeg456'][:-(wi-1)*Na,0],movingaveragex(arb['forsoeg'+str(x)+'60'],wi,Na),"x",table['forsoeg456'][:-(wi-1)*Na,0],movingaveragex(arb['forsoeg'+str(x)+'85'],wi,Na),"o")
+
 plt.legend()
 
 plt.show()
