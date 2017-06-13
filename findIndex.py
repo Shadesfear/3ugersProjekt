@@ -25,6 +25,7 @@ table.update(fileImport(dataDir,'.txt', skip_head = 19, skip_foot= 2, delimiter 
 
 d = {}
 d['empty'], d['0'], d['25'], d['50'], d['75'], d['100'] = [0] * 3645, [0] * 3645, [0] * 3645, [0] * 3645, [0] * 3645, [0] * 3645
+d['lambda'] = table['index000'][:,0]
 
 for data in table:
 	if int(data[len(data)-2:len(data)]) < 20:
@@ -41,15 +42,32 @@ for data in table:
 		d['0'] = table[data][:,1] + d['0']
 
 for data in d:
-	if data = empty:
+	if data == 'empty':
 		d[data] = d[data] / 20
 	else:
 		d[data] = d[data] / 10
+# print(len(d))
+
 n1 = 1.0
+nwater = 1.333
+
 
 # Find n2 using formulars (I = I0 * (1 -r)^2 / (1 - r^2) and r = (n2 - n1)^2 / (n1 +  n2)^2)
 # and using the difference in I from when cuvette is empty and containing only demin. water
+n2 = []
+for i in range(0, len(d['lambda'])):
+	coefs = [1000000*d['0'][i], -10664000*d['empty'][i] - 666000*d['0'][i], 18772889*d['0'][i], -10664000*d['empty'][i] + 887778*d['0'][i], 1776889*d['0'][i]]
+	roots = np.roots(coefs)
+	print(np.real(roots[0]).shape)
+	if len(roots):
+		n2.extend(np.real(roots[0]))
+	else:
+		n2.extend(math.nan)
 
+# print(len(n2))
+
+plt.plot(d['lambda'], n2)
+plt.show()
 
 
 # Find n2 using formulars (I = I0 * (1 -r)^2 / (1 - r^2) and r = (n2 - n1)^2 / (n1 +  n2)^2)

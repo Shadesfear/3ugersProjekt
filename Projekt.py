@@ -8,13 +8,18 @@ from detect_peaks import detect_peaks
 from movingaverage import movingaverage
 import math
 import scipy.fftpack
-
+from optparse import OptionParser
+from scipy.optimize import curve_fit
 
 ################################################################################
 # The method to use
-method = input('Please Choose "fourier" or "peaks": ')
-if not method:
-	method = 'peaks'
+parser = OptionParser()
+parser.add_option("-f", "--fourier", dest="fouriermethod", help="use Fourier method", action='store_true', default=False)
+parser.add_option("-g", "--graphs", dest="showgraphs", help="show all graphs", action='store_true', default=False)
+(options, args) = parser.parse_args()
+fouriermethod = options.fouriermethod
+showgraphs = options.showgraphs
+
 #Dict to store data
 table = {}
 
@@ -38,13 +43,14 @@ I0 = I0 / 50
 
 # Find the refractive index of the solution
 n1 = 1.0
-n2 = 1.333
+n2 = 1.31279 + ( 15.762 * (table['forsoeg100'][:,0]**(-1)) ) - ( 4382 * (table['forsoeg100'][:,0]**(-2)) ) + ( (1.1455 * (10**6)) * (table['forsoeg100'][:,0]**(-3)) )
 r = ((n2 - n1)/(n1 + n2)) ** 2
-
+def nindex(l):
+	return 1.31279 + ( 15.762 * (l**(-1)) ) - ( 4382 * (l**(-2)) ) + ( (1.1455 * (10**6)) * (l**(-3)) )
 
 ################################################################################
 # Main code for finding lambda etc
-def findlambda2(expnr, measnr, showgraphs, method): # type = 'fourier' or 'peaks'
+def findlambda2(expnr, measnr, showgraphs, fouriermethod): # type = 'fourier' or 'peaks'
 	# Find the absorption-spectrum for experiment NMM
 	if len(str(measnr)) < 2:
 		exp = 'forsoeg' + str(expnr) + str(0) + str(measnr)
@@ -54,38 +60,42 @@ def findlambda2(expnr, measnr, showgraphs, method): # type = 'fourier' or 'peaks
 	a = I0 * (1 - r)**2 / (1 - r**2) - I # absorption
 	A = movingaverage(a, 100, 3) # absorption (movingaverage to smooth out the function)
 
-	if method == 'peaks':
+	if not fouriermethod:
 		# Find peaks
-		peakIndices = detect_peaks(A, mph=np.mean(A), mpd=100)
+		peakIndices = detect_peaks(A, mph=10, mpd=100)
 		peaks = []
 		for peakIndex in peakIndices:
 			if (table[exp][peakIndex,0] > 400 and table[exp][peakIndex,0] < 1000):
 				peaks.append(table[exp][peakIndex,0])
 		# print(peaks)
-		if showgraphs == 'showgraphs':
+		if showgraphs:
 			# Figure with results
+			plt.figure()
+			plt.title('Experiment nr: ' + str(expnr) + ' Measurement nr: ' + str(measnr))
 			plt.plot(table[exp][:,0], a, 'b-', label='fit')
 			plt.plot(table[exp][:,0], A, 'r-', label='fit')
 			for peak in peaks:
 				plt.axvline(x=peak)
 			plt.show()
 		# Find lambda2 (inside the film) in [nm]
+		lambda2 = 0
 		if len(peaks) > 1:
-			m = abs(((min(peaks) * (1 + (2 * (len(peaks) - 1)))) - max(peaks) ) / (2 * (max(peaks) - min(peaks))))
-			lambda1 = (m / 2) * min(peaks)
-			lambda2 = lambda1 * ( n1 / n2 )
+			for i in range(0, len(peaks) -1):
+				m = (peaks[i+1]/nindex(peaks[i+1]) + peaks[i]/nindex(peaks[i])) / (2* (peaks[i+1]/nindex(peaks[i+1]) - peaks[i]/nindex(peaks[i])))
+				lambda2 = (m / 2) * peaks[i]/nindex(peaks[i]) + lambda2
+			lambda2 = lambda2 / (len(peaks) - 1)
 		else:
 			lambda2 = math.nan
 		return lambda2
 
-	if method == 'fourier':
+	if fouriermethod:
 		N = len(table[exp][:,0])
 		T = (table[exp][-1,0] - table[exp][0,0]) / N # spacing between points (lambdas)
 		freqs = np.linspace(0.0, 1.0 / (2.0 * T), N / 2.0)
 		A_fourier = scipy.fftpack.fft(A)
 		a_fourier = scipy.fftpack.fft(a)
 
-		if showgraphs == 'showgraphs':
+		if showgraphs:
 			plt.plot(freqs, 2.0/N * np.abs(A_fourier[:N//2]), 'b.')
 			plt.show()
 
@@ -95,24 +105,68 @@ def findlambda2(expnr, measnr, showgraphs, method): # type = 'fourier' or 'peaks
 		# print(maxfreq)
 
 		lambda1 = (table[exp][-1,0] - table[exp][0,0]) / maxfreqIndex # missing a factor of 2 cf def. of freqs?
-		lambda2 = lambda1 * (n1 / n2)
+		lambda2 = lambda1 * (n1 /n2)
 		return lambda2
 
 ################################################################################
+
+# Make dict of lambda2 where each entry is an array of lambda as a function of time for the given experiment
+# (convert to d)
 lambda2 = {}
-for i in range(1, 7+1):
+for i in range(0, 7):
 	lambda2[str(i)] = []
-	for j in range(0,99+1):
+	for j in range(0,100):
 		# Following line filters out the beginning measurements (where the beaker was blocking the signal)
-		if not ((i == 1 and j < 7) or (i == 2 and j < 16) or (i == 3 and j < 12) or (i == 4 and j < 9)
-		or (i == 5 and j < 12) or (i == 6 and j < 11) or (i == 7 and j < 12)):
-			lambda2[str(i)].append(findlambda2(i, j, 'noshowgraphs', method))
+		if not ((i == 0 and j < 7) or (i == 1 and j < 16) or (i == 2 and j < 12) or (i == 3 and j < 9)
+		or (i == 4 and j < 12) or (i == 5 and j < 11) or (i == 6 and j < 12)):
+			lambda2[str(i)].append(findlambda2(i + 1, j, showgraphs, fouriermethod))
 		else:
 			lambda2[str(i)].append(math.nan)
 		j += 1
 	i += 1
 
 time = np.linspace(0, 8, num=100)
-for i in range(1, len(lambda2)+1):
-	plt.plot(time, lambda2[str(i)], 'b.', label='fit')
-	plt.show()
+
+# Find concentrations of soap in different experiments
+ml = [13.2, 22.1, 35.9, 41.8, 76.3, 84.0]
+concentrations = [0, 0, 0, 0, 0, 0, 0]
+for j in range(0, 6):
+	for i in range(0,j+1):
+		concentrations[j] += ml[i]
+	concentrations[j] = concentrations[j] / (105.1 + concentrations[j])
+concentrations[6] = 1
+
+# Function to fit to (cf theory)
+def func(x, a, b):
+	return(1 / np.sqrt(a * x + b))
+
+# Fitting to model
+avals = [0, 0, 0, 0, 0, 0, 0]
+bvals = [0, 0, 0, 0, 0, 0, 0]
+for i in range(0, 7):
+	x = []
+	y = []
+	for idx in range(0,len(lambda2[str(i)])):
+		if not 'nan' in str(lambda2[str(i)][idx]):
+			y.append(lambda2[str(i)][idx])
+			x.append(time[idx])
+	popt, pcov = curve_fit(func, x, y, p0 = [1, 1])
+	avals[i] = popt[0]
+	bvals[i] = popt[1]
+	# Plot
+	plt.figure()
+	plt.plot(time, lambda2[str(i)], 'b.', label= str(round(100 * concentrations[i])) + ' vol%')
+	plt.plot(time, func(time, avals[i], bvals[i]), 'r-', label= 'fit')
+	plt.legend()
+#print(avals)
+#print(bvals)
+
+# Plot all data in one figure
+plt.figure()
+for i in range(0, 7):
+	plt.plot(time, lambda2[str(i)], '.', label= str(round(100 * concentrations[i])) + ' vol%')
+plt.legend()
+plt.axis([0, 8, 900, 3000])
+plt.ylabel('$d$ [nm]')
+plt.xlabel('$t$ [s]')
+plt.show()
