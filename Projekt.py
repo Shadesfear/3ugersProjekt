@@ -140,6 +140,12 @@ concentrations[6] = 1
 def func(x, a, b):
 	return(1 / np.sqrt(a * x + b))
 
+def linfunc(x,a,b):
+	return(a * x + b)
+
+def transmodel(my_list):
+    return [ 1/x**2 for x in my_list ]
+
 # Fitting to model
 avals = [0, 0, 0, 0, 0, 0, 0]
 bvals = [0, 0, 0, 0, 0, 0, 0]
@@ -150,13 +156,15 @@ for i in range(0, 7):
 		if not 'nan' in str(lambda2[str(i)][idx]):
 			y.append(lambda2[str(i)][idx])
 			x.append(time[idx])
-	popt, pcov = curve_fit(func, x, y, p0 = [1, 1])
+	popt, pcov = curve_fit(linfunc, x, transmodel(y), p0 = [1, 1])
 	avals[i] = popt[0]
 	bvals[i] = popt[1]
 	# Plot
 	plt.figure()
-	plt.plot(time, lambda2[str(i)], 'b.', label= str(round(100 * concentrations[i])) + ' vol%')
-	plt.plot(time, func(time, avals[i], bvals[i]), 'r-', label= 'fit')
+	plt.plot(time, transmodel(lambda2[str(i)]), 'b.', label= str(round(100 * concentrations[i])) + ' vol%')
+	plt.plot(time, linfunc(time, avals[i], bvals[i]), 'r-', label= 'fit')
+	plt.ylabel('$1/d^2$ [nm$^{-2}$]')
+	plt.xlabel('$t$ [s]')
 	plt.legend()
 #print(avals)
 #print(bvals)
