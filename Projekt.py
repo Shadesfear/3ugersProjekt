@@ -65,8 +65,13 @@ def findD(expnr, measnr, showgraphs, fouriermethod): # type = 'fourier' or 'peak
 		peakIndices = detect_peaks(A, mph=10, mpd=100)
 		peaks = []
 		for peakIndex in peakIndices:
-			if (table[exp][peakIndex,0] > 400 and table[exp][peakIndex,0] < 1000):
+			if (table[exp][peakIndex,0] > 600 and table[exp][peakIndex,0] < 900):
 				peaks.append(table[exp][peakIndex,0])
+		dipIndices = detect_peaks(-A, mph=10, mpd=100)
+		dips = []
+		for dipIndex in dipIndices:
+			if (table[exp][dipIndex,0] > 600 and table[exp][dipIndex,0] < 900):
+				dips.append(table[exp][dipIndex,0])
 		# print(peaks)
 		if showgraphs:
 			# Figure with results
@@ -75,18 +80,30 @@ def findD(expnr, measnr, showgraphs, fouriermethod): # type = 'fourier' or 'peak
 			plt.plot(table[exp][:,0], a, 'b-', label='fit')
 			plt.plot(table[exp][:,0], A, 'r-', label='fit')
 			for peak in peaks:
-				plt.axvline(x=peak, color='g')
+				plt.axvline(x=peak, color='g', ls='dashed')
+			for dip in dips:
+				plt.axvline(x=dip, color='g', ls='dotted')
 			plt.show()
-		# Find lambda2 (inside the film) in [nm]
-		lambda2 = 0
+		# Find D of the film in [nm]
+		Dp = 0
+		Dd = 0
+
 		if len(peaks) > 1:
 			for i in range(0, len(peaks) -1):
 				m = (peaks[i+1]/nindex(peaks[i+1]) + peaks[i]/nindex(peaks[i])) / (2* (peaks[i+1]/nindex(peaks[i+1]) - peaks[i]/nindex(peaks[i])))
-				lambda2 = (m / 2) * peaks[i]/nindex(peaks[i]) + lambda2
-			lambda2 = lambda2 / (len(peaks) - 1)
+				Dp = (nindex(peaks[i]) / 2) * peaks[i]/nindex(peaks[i]) * (m + 1/2) + Dp
+			Dp = Dp / (len(peaks) - 1)
+
+		if len(dips) > 1:
+			for i in range(0, len(dips) -1):
+				m = (dips[i+1]/nindex(dips[i+1])) / ((dips[i+1]/nindex(dips[i+1]) - dips[i]/nindex(dips[i])))
+				Dd = (nindex(dips[i]) / 2) * dips[i]/nindex(dips[i]) * m + Dd
+			Dd = Dd / (len(dips) - 1)
+
+		if not (Dp == 0 and Dd == 0):
+			D = (1/2 * Dp  + 1/2 * Dd)/ 2
 		else:
-			lambda2 = math.nan
-		D = lambda2 / 2
+			D = math.nan
 		return D
 
 	if fouriermethod:
@@ -151,13 +168,35 @@ def transmodel(my_list):
 avals = [0, 0, 0, 0, 0, 0, 0]
 bvals = [0, 0, 0, 0, 0, 0, 0]
 for i in range(0, 7):
-	x = []
-	y = []
+	x1, y1 = [], []
+	x, y = [], []
+	# Remove NaNs
 	for idx in range(0,len(D[str(i)])):
 		if not 'nan' in str(D[str(i)][idx]):
-			y.append(D[str(i)][idx])
-			x.append(time[idx])
-	popt, pcov = curve_fit(linfunc, x, transmodel(y), p0 = [1, 1])
+			y1.append(D[str(i)][idx])
+			x1.append(time[idx])
+	y1 = transmodel(y1)
+	# Remove outliers and only choose first second
+	for idx in range(0,len(x1)):
+		if x1[idx] < (x1[0] + 1):
+			if i == 2:
+				if y1[idx] < 0.0000010:
+					x.append(x1[idx])
+					y.append(y1[idx])
+			elif i == 6:
+				if y1[idx] < 0.0000014:
+					x.append(x1[idx])
+					y.append(y1[idx])
+			elif i == 3:
+				if (y1[idx] > 0.0000014) and (x1[idx] > 1.1):
+					x.append(x1[idx])
+					y.append(y1[idx])
+			else:
+				if y1[idx] < 0.0000020:
+					x.append(x1[idx])
+					y.append(y1[idx])
+	# print(str(len(x)) + ' vs ' + str(len(y)))
+	popt, pcov = curve_fit(linfunc, x, y, p0 = [0.1, 0])
 	avals[i] = popt[0]
 	bvals[i] = popt[1]
 
@@ -169,10 +208,18 @@ for i in range(0, 7):
 	plt.xlabel('$t$ [s]')
 	plt.legend()
 
-print('Values of a (in $1/d^2 = a t + b$) for experiments 1-7:')
+print('\n Values of a (in $1/d^2 = a t + b$) for experiments 1-7:')
 print(avals)
-print('\n')
+print()
 #print(bvals)
+
+def times100(array):
+	return [ 100 * x for x in array ]
+
+plt.figure()
+plt.plot(times100(concentrations), avals, 'o')
+plt.xlabel('$C($soap$)$ [%]')
+plt.ylabel('$a$ [1/snm$^2$]')
 
 # Plot all data in one figure
 plt.figure()
