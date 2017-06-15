@@ -18,10 +18,12 @@ for x in subdirs:
 	table.update(fileImport(dataDir + x,'.txt', skip_head = 19, skip_foot= 2, delimiter ='\t'))
 
 arb = {}
-transm = ((1-1.4)**2)/(2.4)**2
+ref = ((1-1.33)**2)/(2.33)**2
+transm = (1-ref)**2/(1-ref**2)
+
 print(transm)
 for x in table:
-	arb[x] = table['nobub165'][:,1]-table['nobub165'][:,1]*transm - table[x][:,1]
+	arb[x] = table['nobub165'][:,1]*transm - table[x][:,1]
 
 print(arb['forsoeg464'])
 
