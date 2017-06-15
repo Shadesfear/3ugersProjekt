@@ -10,6 +10,8 @@ import math
 import scipy.fftpack
 from optparse import OptionParser
 from scipy.optimize import curve_fit
+import matplotlib.ticker as mtick
+
 
 ################################################################################
 # The method to use
@@ -62,12 +64,12 @@ def findD(expnr, measnr, showgraphs, fouriermethod): # type = 'fourier' or 'peak
 
 	if not fouriermethod:
 		# Find peaks
-		peakIndices = detect_peaks(A, mph=10, mpd=100)
+		peakIndices = detect_peaks(A, mph=-1000, mpd=100)
 		peaks = []
 		for peakIndex in peakIndices:
 			if (table[exp][peakIndex,0] > 500 and table[exp][peakIndex,0] < 900):
 				peaks.append(table[exp][peakIndex,0])
-		dipIndices = detect_peaks(-A, mph=10, mpd=100)
+		dipIndices = detect_peaks(-A, mph=-1000, mpd=100)
 		dips = []
 		for dipIndex in dipIndices:
 			if (table[exp][dipIndex,0] > 500 and table[exp][dipIndex,0] < 900):
@@ -106,9 +108,6 @@ def findD(expnr, measnr, showgraphs, fouriermethod): # type = 'fourier' or 'peak
 		elif Dp:
 				D = np.mean(Dp)
 				sigD = np.std(Dp)
-		elif Dd:
-			D = np.mean(Dd)
-			sigD = np.std(Dd)
 		else:
 			D = math.nan
 			sigD = math.nan
@@ -173,6 +172,8 @@ def func(x, a, b):
 # Linear function
 def linfunc(x,a,b):
 	return(a * x + b)
+def linfuncarray(my_list,a,b):
+	return [ linfunc(x, a, b) for x in my_list ]
 # Transform of d, so is linear
 def transmodel(my_list):
     return [ 1/x**2 for x in my_list ]
@@ -213,13 +214,17 @@ for i in range(0, 7):
 	cov[i] = pcov[0][1]
 
 	# Plot fit and data
-	fig, ax = plt.subplots()
-	ax.errorbar(x1, y1, yerr=sigy1, fmt='b.', label= str(round(100 * concentrations[i])) + ' vol%')
-	plt.plot()
-	plt.plot(time, linfunc(time, avals[i], bvals[i]), 'r-', label= 'fit')
-	plt.ylabel('$1/d^2$ [nm$^{-2}$]')
-	plt.xlabel('$t$ [s]')
-	plt.legend()
+	fig, ax = plt.subplots(figsize=(3.5, 2.8))
+	ax.errorbar(x1, y1, yerr=sigy1, fmt='b.', label= str(round(100 * concentrations[i])) + ' vol%', markersize=1.1, linewidth=0.7)
+	plt.plot(time, linfunc(time, avals[i], bvals[i]), 'r-', label= 'fit', linewidth=0.7)
+	plt.ylabel('$1/d^2$ [nm$^{-2}$]', fontsize=8)
+	plt.xlabel('$t$ [s]', fontsize=8)
+	plt.xticks(fontsize = 6)
+	plt.yticks(fontsize = 6)
+	ax.yaxis.set_major_formatter(mtick.FormatStrFormatter('%.0e'))
+	plt.tight_layout()
+	plt.legend(fontsize=6)
+	plt.savefig('1overd2_' + str(i) + '.png', dpi=600)
 
 print('\n Values of a (in $1/d^2 = a t + b$) for experiments 1-7:')
 print(avals)
@@ -229,16 +234,33 @@ print(asig)
 def times100(array):
 	return [ 100 * x for x in array ]
 
-plt.figure()
-plt.plot(times100(concentrations), avals, 'o')
-plt.xlabel('$C($soap$)$ [%]')
-plt.ylabel('$a$ [1/snm$^2$]')
+x = [times100(concentrations)[i] for i in [0, 1, 2, 4, 5, 6]]
+y = [avals[i] for i in [0, 1, 2, 4, 5, 6]]
+sigy = [asig[i] for i in [0, 1, 2, 4, 5, 6]]
+print(x)
+print(y)
+popt, pcov = curve_fit(linfunc, x, y, sigma=sigy)
+
+fig, ax = plt.subplots(figsize=(3.5, 2.8))
+ax.errorbar(times100(concentrations), avals, asig, fmt='.', label= str(round(100 * concentrations[i])) + ' Vol-%', markersize=5.0)
+plt.plot([0, 110], [(popt[1]), (110*popt[0] + popt[1])], 'r--', linewidth=0.7)
+plt.xlim(10, 105)
+plt.xlabel('$C($soap$)$ [%]', fontsize=8)
+plt.ylabel('$a$ [1/s$\cdot$nm$^2$]', fontsize=8)
+plt.xticks(fontsize = 6)
+plt.yticks(fontsize = 6)
+plt.tight_layout()
+plt.savefig('a.png', dpi=600)
 
 # Plot all data in one figure
-fig, ax = plt.subplots()
+fig, ax = plt.subplots(figsize=(3.5, 2.8))
 for i in range(0, 7):
-	ax.errorbar(time, D[str(i)], sigD[str(i)], fmt='.', label= str(round(100 * concentrations[i])) + ' Vol-%')
-plt.legend()
-plt.ylabel('$d$ [nm]')
-plt.xlabel('$t$ [s]')
+	ax.errorbar(time, D[str(i)], sigD[str(i)], fmt='.', label= str(round(100 * concentrations[i])) + ' Vol-%', markersize=1.1, linewidth=0.7)
+plt.legend(fontsize=6)
+plt.ylabel('$d$ [nm]', fontsize=8)
+plt.xlabel('$t$ [s]', fontsize=8)
+plt.xticks(fontsize = 6)
+plt.yticks(fontsize = 6, rotation='vertical')
+plt.tight_layout()
+plt.savefig('dmeasured.png', dpi=600)
 plt.show()
