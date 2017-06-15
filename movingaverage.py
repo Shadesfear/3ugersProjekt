@@ -1,4 +1,3 @@
-
 import numpy as np
 
 # Function for finding the

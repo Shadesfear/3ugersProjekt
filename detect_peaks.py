@@ -1,4 +1,5 @@
-"""Detect peaks in data based on their amplitude and other features."""
+"""Detect peaks in data based on their amplitude and other features.
+From: https://nbviewer.jupyter.org/github/demotu/BMC/blob/master/notebooks/DetectPeaks.ipynb"""
 
 from __future__ import division, print_function
 import numpy as np

@@ -65,46 +65,54 @@ def findD(expnr, measnr, showgraphs, fouriermethod): # type = 'fourier' or 'peak
 		peakIndices = detect_peaks(A, mph=10, mpd=100)
 		peaks = []
 		for peakIndex in peakIndices:
-			if (table[exp][peakIndex,0] > 600 and table[exp][peakIndex,0] < 900):
+			if (table[exp][peakIndex,0] > 500 and table[exp][peakIndex,0] < 900):
 				peaks.append(table[exp][peakIndex,0])
 		dipIndices = detect_peaks(-A, mph=10, mpd=100)
 		dips = []
 		for dipIndex in dipIndices:
-			if (table[exp][dipIndex,0] > 600 and table[exp][dipIndex,0] < 900):
+			if (table[exp][dipIndex,0] > 500 and table[exp][dipIndex,0] < 900):
 				dips.append(table[exp][dipIndex,0])
 		# print(peaks)
 		if showgraphs:
 			# Figure with results
 			plt.figure()
-			plt.title('Experiment nr: ' + str(expnr) + ' Measurement nr: ' + str(measnr))
+			# plt.title('Experiment nr: ' + str(expnr) + ' Measurement nr: ' + str(measnr))
 			plt.plot(table[exp][:,0], a, 'b-', label='fit')
 			plt.plot(table[exp][:,0], A, 'r-', label='fit')
 			for peak in peaks:
-				plt.axvline(x=peak, color='g', ls='dashed')
-			for dip in dips:
-				plt.axvline(x=dip, color='g', ls='dotted')
+				plt.axvline(x=peak, color='k', ls='dashed')
+			# for dip in dips:
+			# 	plt.axvlifFne(x=dip, color='k', ls='dashdot')
+			plt.xlabel('$\lambda$ [nm]')
+			plt.ylabel('$\\frac{(1 - r)^2}{1 - r^2} I_0 - I$ [n]')
 			plt.show()
 		# Find D of the film in [nm]
-		Dp = 0
-		Dd = 0
+		Dp = []
+		Dd = []
 
 		if len(peaks) > 1:
 			for i in range(0, len(peaks) -1):
 				m = (peaks[i+1]/nindex(peaks[i+1]) + peaks[i]/nindex(peaks[i])) / (2* (peaks[i+1]/nindex(peaks[i+1]) - peaks[i]/nindex(peaks[i])))
-				Dp = (nindex(peaks[i]) / 2) * peaks[i]/nindex(peaks[i]) * (m + 1/2) + Dp
-			Dp = Dp / (len(peaks) - 1)
+				Dp.append((nindex(peaks[i]) / 2) * peaks[i]/nindex(peaks[i]) * (m + 1/2) )
 
 		if len(dips) > 1:
 			for i in range(0, len(dips) -1):
 				m = (dips[i+1]/nindex(dips[i+1])) / ((dips[i+1]/nindex(dips[i+1]) - dips[i]/nindex(dips[i])))
-				Dd = (nindex(dips[i]) / 2) * dips[i]/nindex(dips[i]) * m + Dd
-			Dd = Dd / (len(dips) - 1)
+				Dd.append( (nindex(dips[i]) / 2) * dips[i]/nindex(dips[i]) * m  )
 
-		if not (Dp == 0 and Dd == 0):
-			D = (1/2 * Dp  + 1/2 * Dd)/ 2
+		if(Dp and Dd):
+			D = (1/2 * abs(np.mean(Dp))  + 1/2 * abs(np.mean(Dd)))
+			sigD = np.sqrt(1/4 * (np.std(Dp)**2) + 1/4 * (np.std(Dd)**2))
+		elif Dp:
+				D = np.mean(Dp)
+				sigD = np.std(Dp)
+		elif Dd:
+			D = np.mean(Dd)
+			sigD = np.std(Dd)
 		else:
 			D = math.nan
-		return D
+			sigD = math.nan
+		return D, sigD
 
 	if fouriermethod:
 		N = len(table[exp][:,0])
@@ -131,15 +139,20 @@ def findD(expnr, measnr, showgraphs, fouriermethod): # type = 'fourier' or 'peak
 # Make dict of lambda2 where each entry is an array of lambda as a function of time for the given experiment
 # (convert to d)
 D = {}
+sigD = {}
 for i in range(0, 7):
 	D[str(i)] = []
+	sigD[str(i)] = []
 	for j in range(0,100):
 		# Following line filters out the beginning measurements (where the beaker was blocking the signal)
 		if not ((i == 0 and j < 7) or (i == 1 and j < 16) or (i == 2 and j < 12) or (i == 3 and j < 9)
 		or (i == 4 and j < 12) or (i == 5 and j < 11) or (i == 6 and j < 12)):
-			D[str(i)].append(findD(i + 1, j, showgraphs, fouriermethod))
+			x, sigx = findD(i + 1, j, showgraphs, fouriermethod)
+			D[str(i)].append(x)
+			sigD[str(i)].append(sigx)
 		else:
 			D[str(i)].append(math.nan)
+			sigD[str(i)].append(math.nan)
 		j += 1
 	i += 1
 
@@ -164,45 +177,45 @@ def linfunc(x,a,b):
 def transmodel(my_list):
     return [ 1/x**2 for x in my_list ]
 
+def times(list1, list2):
+	return([list1[i]*list2[i] for i in range(len(list1))])
+
 # Fitting to model
 avals = [0, 0, 0, 0, 0, 0, 0]
 bvals = [0, 0, 0, 0, 0, 0, 0]
+asig = [0, 0, 0, 0, 0, 0, 0]
+bsig = [0, 0, 0, 0, 0, 0, 0]
+cov = [0, 0, 0, 0, 0, 0, 0]
 for i in range(0, 7):
-	x1, y1 = [], []
-	x, y = [], []
+	x1, y1, sigy1 = [], [], []
+	x, y, sigy = [], [], []
 	# Remove NaNs
 	for idx in range(0,len(D[str(i)])):
 		if not 'nan' in str(D[str(i)][idx]):
-			y1.append(D[str(i)][idx])
+			y1.append(1 / (D[str(i)][idx] ** 2) )
 			x1.append(time[idx])
-	y1 = transmodel(y1)
+			sigy1.append((2 / (D[str(i)][idx] ** 3) ) * sigD[str(i)][idx])
+
 	# Remove outliers and only choose first second
 	for idx in range(0,len(x1)):
 		if x1[idx] < (x1[0] + 1):
-			if i == 2:
-				if y1[idx] < 0.0000010:
-					x.append(x1[idx])
-					y.append(y1[idx])
-			elif i == 6:
-				if y1[idx] < 0.0000014:
-					x.append(x1[idx])
-					y.append(y1[idx])
-			elif i == 3:
-				if (y1[idx] > 0.0000014) and (x1[idx] > 1.1):
-					x.append(x1[idx])
-					y.append(y1[idx])
-			else:
-				if y1[idx] < 0.0000020:
-					x.append(x1[idx])
-					y.append(y1[idx])
-	# print(str(len(x)) + ' vs ' + str(len(y)))
-	popt, pcov = curve_fit(linfunc, x, y, p0 = [0.1, 0])
+			if (i == 3 and x1[idx] > 1.1) or (i != 3):
+				x.append(x1[idx])
+				y.append(y1[idx])
+				sigy.append(sigy1[idx])
+
+	# print(str(len(x1)) + '  ' + str(len(y1)) + '  ' + str(len(sigy1)))
+	popt, pcov = curve_fit(linfunc, x, y, p0 = [0.1, 0], sigma=sigy)
 	avals[i] = popt[0]
 	bvals[i] = popt[1]
+	asig[i] = pcov[0][0]
+	asig[i] = pcov[1][1]
+	cov[i] = pcov[0][1]
 
 	# Plot fit and data
-	plt.figure()
-	plt.plot(time, transmodel(D[str(i)]), 'b.', label= str(round(100 * concentrations[i])) + ' vol%')
+	fig, ax = plt.subplots()
+	ax.errorbar(x1, y1, yerr=sigy1, fmt='b.', label= str(round(100 * concentrations[i])) + ' vol%')
+	plt.plot()
 	plt.plot(time, linfunc(time, avals[i], bvals[i]), 'r-', label= 'fit')
 	plt.ylabel('$1/d^2$ [nm$^{-2}$]')
 	plt.xlabel('$t$ [s]')
@@ -210,7 +223,7 @@ for i in range(0, 7):
 
 print('\n Values of a (in $1/d^2 = a t + b$) for experiments 1-7:')
 print(avals)
-print()
+print(asig)
 #print(bvals)
 
 def times100(array):
@@ -222,11 +235,10 @@ plt.xlabel('$C($soap$)$ [%]')
 plt.ylabel('$a$ [1/snm$^2$]')
 
 # Plot all data in one figure
-plt.figure()
+fig, ax = plt.subplots()
 for i in range(0, 7):
-	plt.plot(time, D[str(i)], '.', label= str(round(100 * concentrations[i])) + ' Vol-%')
+	ax.errorbar(time, D[str(i)], sigD[str(i)], fmt='.', label= str(round(100 * concentrations[i])) + ' Vol-%')
 plt.legend()
-plt.axis([0, 8, 900, 3000])
 plt.ylabel('$d$ [nm]')
 plt.xlabel('$t$ [s]')
 plt.show()
