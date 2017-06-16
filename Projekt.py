@@ -75,19 +75,24 @@ def findD(expnr, measnr, showgraphs, fouriermethod): # type = 'fourier' or 'peak
 			if (table[exp][dipIndex,0] > 500 and table[exp][dipIndex,0] < 900):
 				dips.append(table[exp][dipIndex,0])
 		# print(peaks)
-		if showgraphs:
+		if showgraphs and ((expnr == 1) and (measnr == 20)):
 			# Figure with results
-			plt.figure()
+			plt.figure(figsize=(3.5, 2.8))
 			# plt.title('Experiment nr: ' + str(expnr) + ' Measurement nr: ' + str(measnr))
-			plt.plot(table[exp][:,0], a, 'b-', label='fit')
-			plt.plot(table[exp][:,0], A, 'r-', label='fit')
+			plt.plot(table[exp][:,0], a, 'b-', label='fit', linewidth=0.7)
+			plt.plot(table[exp][:,0], A, 'r-', label='fit', linewidth=2.1)
 			for peak in peaks:
-				plt.axvline(x=peak, color='k', ls='dashed')
+				plt.axvline(x=peak, color='k', ls='dashed', linewidth=1.4)
 			# for dip in dips:
 			# 	plt.axvlifFne(x=dip, color='k', ls='dashdot')
-			plt.xlabel('$\lambda$ [nm]')
-			plt.ylabel('$\\frac{(1 - r)^2}{1 - r^2} I_0 - I$ [n]')
-			plt.show()
+			plt.xlabel('$\lambda$ [nm]', fontsize=8)
+			plt.ylabel('$\\frac{(1 - r)^2}{1 - r^2} I_0 - I$ [n]', fontsize=8)
+			plt.xticks(fontsize = 6)
+			plt.yticks(fontsize = 6, rotation='vertical')
+			plt.tight_layout()
+			plt.savefig('absorbance.png', dpi=600)
+			print('Figure saved!')
+
 		# Find D of the film in [nm]
 		Dp = []
 		Dd = []
@@ -159,10 +164,12 @@ time = np.linspace(0, 8, num=100)
 
 # Find concentrations of soap in different experiments
 ml = [13.2, 22.1, 35.9, 41.8, 76.3, 84.0]
+totml = [0, 0, 0, 0, 0, 0, 0]
 concentrations = [0, 0, 0, 0, 0, 0, 0]
 for j in range(0, 6):
 	for i in range(0,j+1):
 		concentrations[j] += ml[i]
+		totml[j] += ml[i]
 	concentrations[j] = concentrations[j] / (105.1 + concentrations[j])
 concentrations[6] = 1
 
@@ -200,32 +207,38 @@ for i in range(0, 7):
 	# Remove outliers and only choose first second
 	for idx in range(0,len(x1)):
 		if x1[idx] < (x1[0] + 1):
-			if (i == 3 and x1[idx] > 1.1) or (i != 3):
+			if (i != 3) or (i == 3 and x1[idx] > 1.1):
 				x.append(x1[idx])
 				y.append(y1[idx])
 				sigy.append(sigy1[idx])
 
 	# print(str(len(x1)) + '  ' + str(len(y1)) + '  ' + str(len(sigy1)))
-	popt, pcov = curve_fit(linfunc, x, y, p0 = [0.1, 0], sigma=sigy)
+	popt, pcov = curve_fit(linfunc, x, y, sigma=sigy)
 	avals[i] = popt[0]
 	bvals[i] = popt[1]
-	asig[i] = pcov[0][0]
-	asig[i] = pcov[1][1]
+	asig[i] = np.sqrt(pcov[0][0])
+	bsig[i] = np.sqrt(pcov[1][1])
 	cov[i] = pcov[0][1]
 
 	# Plot fit and data
 	fig, ax = plt.subplots(figsize=(3.5, 2.8))
 	ax.errorbar(x1, y1, yerr=sigy1, fmt='b.', label= str(round(100 * concentrations[i])) + ' vol%', markersize=1.1, linewidth=0.7)
 	plt.plot(time, linfunc(time, avals[i], bvals[i]), 'r-', label= 'fit', linewidth=0.7)
+	plt.xlim(0.8, 8.1)
+	plt.ylim(0, 0.0000004)
 	plt.ylabel('$1/d^2$ [nm$^{-2}$]', fontsize=8)
 	plt.xlabel('$t$ [s]', fontsize=8)
 	plt.xticks(fontsize = 6)
 	plt.yticks(fontsize = 6)
 	ax.yaxis.set_major_formatter(mtick.FormatStrFormatter('%.0e'))
 	plt.tight_layout()
-	plt.legend(fontsize=6)
 	plt.savefig('1overd2_' + str(i) + '.png', dpi=600)
 
+	chi2 = 0
+	for i in range(len(x)):
+		chi2 = (((popt[0] * x[i] + popt[1]) - y[i])**2)/((sigy[i])**2) + chi2
+	chi2 = chi2 / (len(x) - 1)
+	# print(chi2)
 print('\n Values of a (in $1/d^2 = a t + b$) for experiments 1-7:')
 print(avals)
 print(asig)
@@ -237,12 +250,12 @@ def times100(array):
 x = [times100(concentrations)[i] for i in [0, 1, 2, 4, 5, 6]]
 y = [avals[i] for i in [0, 1, 2, 4, 5, 6]]
 sigy = [asig[i] for i in [0, 1, 2, 4, 5, 6]]
-print(x)
-print(y)
+sigxm = [(100 * 0.1 * np.sqrt(((totml[i])/((totml[i] + 105.1)**2))**2 + (1/(totml[i] + 105.1))**2)) for i in range(7)]
+sigx = [sigxm[i] for i in [0, 1, 2, 4, 5, 6]]
 popt, pcov = curve_fit(linfunc, x, y, sigma=sigy)
 
 fig, ax = plt.subplots(figsize=(3.5, 2.8))
-ax.errorbar(times100(concentrations), avals, asig, fmt='.', label= str(round(100 * concentrations[i])) + ' Vol-%', markersize=5.0)
+ax.errorbar(x, y, yerr=sigy, xerr=sigx, fmt='.', markersize=5.0)
 plt.plot([0, 110], [(popt[1]), (110*popt[0] + popt[1])], 'r--', linewidth=0.7)
 plt.xlim(10, 105)
 plt.xlabel('$C($soap$)$ [%]', fontsize=8)
@@ -254,11 +267,12 @@ plt.savefig('a.png', dpi=600)
 
 # Plot all data in one figure
 fig, ax = plt.subplots(figsize=(3.5, 2.8))
-for i in range(0, 7):
+for i in [0,1,2,4,5,6]:
 	ax.errorbar(time, D[str(i)], sigD[str(i)], fmt='.', label= str(round(100 * concentrations[i])) + ' Vol-%', markersize=1.1, linewidth=0.7)
-plt.legend(fontsize=6)
 plt.ylabel('$d$ [nm]', fontsize=8)
 plt.xlabel('$t$ [s]', fontsize=8)
+plt.xlim(0.5, 8.1)
+plt.ylim(1287, 4525)
 plt.xticks(fontsize = 6)
 plt.yticks(fontsize = 6, rotation='vertical')
 plt.tight_layout()
